@@ -1,0 +1,67 @@
+name: Build GCC .deb (Docker)
+on:
+  workflow_dispatch:
+    inputs:
+      gcc_version:
+        description: 'GCC version to build (e.g. 14.2.0)'
+        required: false
+        default: '14.2.0'
+      glibc_version:
+        description: 'glibc version to build (optional, e.g. 2.35)'
+        required: false
+        default: '2.35'
+      jobs:
+        description: 'Make -j jobs (optional)'
+        required: false
+        default: '2'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set variables
+        run: |
+          echo "GCC_VERSION=${{ github.event.inputs.gcc_version }}" >> $GITHUB_ENV
+          echo "GLIBC_VERSION=${{ github.event.inputs.glibc_version }}" >> $GITHUB_ENV
+          echo "JOBS=${{ github.event.inputs.jobs }}" >> $GITHUB_ENV
+
+      - name: Build Docker image (builder)
+        run: |
+          docker build \
+            --progress=plain \
+            --build-arg GCC_VERSION="${GCC_VERSION}" \
+            --build-arg GLIBC_VERSION="${GLIBC_VERSION}" \
+            --build-arg JOBS="${JOBS}" \
+            -t gcc-deb:build \
+            .
+
+      - name: Create container (to access built artifact)
+        id: create
+        run: |
+          CID=$(docker create --name gcc-deb-temp gcc-deb:build)
+          echo "container_id=$CID" >> $GITHUB_OUTPUT
+
+      - name: Make output dir
+        run: mkdir -p out
+
+      - name: Copy .deb from image
+        run: |
+          CID=${{ steps.create.outputs.container_id }}
+          docker cp "${CID}:/build/gcc-package_${GCC_VERSION}_amd64.deb" out/ || \
+            docker cp "${CID}:/gcc-package_${GCC_VERSION}_amd64.deb" out/ || \
+            (echo "Artifact not found inside container; list /build:" && docker run --rm gcc-deb:build ls -la /build && exit 1)
+
+      - name: Remove temp container
+        if: always()
+        run: |
+          CID=${{ steps.create.outputs.container_id }} || true
+          docker rm -v "${CID}" || true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gcc-package-${{ env.GCC_VERSION }}-amd64
+          path: out/gcc-package_${{ env.GCC_VERSION }}_amd64.deb
