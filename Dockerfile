@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential ca-certificates wget curl \
     libgmp-dev libmpfr-dev libmpc-dev flex bison texinfo \
     python3 gawk unzip autoconf automake patch \
-    dpkg-dev debhelper dh-make \
+    dpkg-dev debhelper dh-make zlib1g-dev \
     sudo locales \
   && rm -rf /var/lib/apt/lists/*
 
