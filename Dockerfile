@@ -133,11 +133,13 @@ RUN rm -f /build/gcc-package_${GCC_VERSION}_amd64.deb && dpkg-deb --build /packa
 
 # Final tiny runtime image that contains the .deb as an artifact layer
 FROM scratch AS artifact
+ARG GCC_VERSION
 COPY --from=builder /build/gcc-package_${GCC_VERSION}_amd64.deb /gcc-package_${GCC_VERSION}_amd64.deb
 
 # A helpful image to extract artifact (this image simply contains the .deb)
 # When you run this image (or use docker create+cp) you can extract the deb.
 FROM ubuntu:18.04 AS final
+ARG GCC_VERSION
 COPY --from=artifact /gcc-package_${GCC_VERSION}_amd64.deb /build/gcc-package_${GCC_VERSION}_amd64.deb
 # Provide an easy-to-run extraction helper (if container is run with -v hostdir:/out)
 CMD ["/bin/sh", "-c", "if [ -d /out ]; then cp /build/gcc-package_${GCC_VERSION}_amd64.deb /out/; echo 'Copied to /out'; else echo '/out not mounted — file is inside image at /build/gcc-package_${GCC_VERSION}_amd64.deb'; fi; sleep 1"]
